@@ -22,7 +22,7 @@ cat <<EOF > $FILENAME
     "encoding":"FLAC",
     "sampleRateHertz":16000,
     "profanityFilter": true,
-    "languageCode": "en-US",
+    "languageCode": "ru-RU",
     "speechContexts": {
       "phrases": ['']
     },
@@ -52,15 +52,36 @@ head -7 $FILENAME # Don't print the entire file because there's a giant base64 s
 echo $'\t"Your base64 string..."\n\x20\x20}\n}'
 
 # Call the speech API (requires an API key)jq '.results[0].alternatives[0].transcript'
-read -p $'\nPress enter when you\'re ready to call the Speech API' var
-if [ -z $var ];
-  then
+#read -p $'\nPress enter when you\'re ready to call the Speech API' var
+#if [ -z $var ];
+#  then
     echo "Running the following curl command:"
     echo "curl -s -X POST -H 'Content-Type: application/json' --data-binary @${FILENAME} https://speech.googleapis.com/v1/speech:recognize?key="
     curl -s -X POST -H "Content-Type: application/json" --data-binary @${FILENAME} https://speech.googleapis.com/v1/speech:recognize?key=$GKEY |jq '.results[0].alternatives[0].transcript' > ttext.txt
-fi
+#fi
+
+#================================
+
+
+
 
 ttext=$(cat ttext.txt)
+
+FILENAME="translate-"`date +"%s".json`
+cat <<EOF > $FILENAME
+{
+'q': $ttext,
+'target': 'en'
+}
+EOF
+
+curl -k -X POST -H "X-Goog-Api-Key: $GKEY" --header "Content-type":"application/json" --data-binary @${FILENAME} "https://translation.googleapis.com/language/translate/v2"|jq '.data.translations[0].translatedText' > translate.txt
+#curl -k -X POST -H "X-Goog-Api-Key: $GKEY" --header "Content-type":"application/json" --data-binary "@synt_settings" "https://translation.googleapis.com/language/translate/v2"|jq '.data[0].translations[0].translatedText' > translate.txt
+
+
+#curl -s -X POST -H "Content-Type: application/json" --data-binary @${FILENAME} https://speech.googleapis.com/v1/speech:recognize?key=$GKEY |jq '.results[0].alternatives[0].transcript' > translate.txt
+#=================================
+ttext=$(cat translate.txt)
 
 FILENAME="speech-"`date +"%s".json`
 cat <<EOF > $FILENAME
