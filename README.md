@@ -2,7 +2,8 @@
 =====================
 requirements:
 
+- sox (rec)
 - jq
-- base64
+- base64 (installed)
 - xplayer
 
