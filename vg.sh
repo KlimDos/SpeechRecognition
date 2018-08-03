@@ -22,7 +22,7 @@ cat <<EOF > $FILENAME
     "encoding":"FLAC",
     "sampleRateHertz":16000,
     "profanityFilter": true,
-    "languageCode": "ru-RU",
+    "languageCode": "en-US",
     "speechContexts": {
       "phrases": ['']
     },
@@ -51,11 +51,42 @@ echo Request "file" $FILENAME created:
 head -7 $FILENAME # Don't print the entire file because there's a giant base64 string
 echo $'\t"Your base64 string..."\n\x20\x20}\n}'
 
-# Call the speech API (requires an API key)
+# Call the speech API (requires an API key)jq '.results[0].alternatives[0].transcript'
 read -p $'\nPress enter when you\'re ready to call the Speech API' var
 if [ -z $var ];
   then
     echo "Running the following curl command:"
     echo "curl -s -X POST -H 'Content-Type: application/json' --data-binary @${FILENAME} https://speech.googleapis.com/v1/speech:recognize?key="
-    curl -s -X POST -H "Content-Type: application/json" --data-binary @${FILENAME} https://speech.googleapis.com/v1/speech:recognize?key=$GKEY
+    curl -s -X POST -H "Content-Type: application/json" --data-binary @${FILENAME} https://speech.googleapis.com/v1/speech:recognize?key=$GKEY |jq '.results[0].alternatives[0].transcript' > ttext.txt
 fi
+
+ttext=$(cat ttext.txt)
+
+FILENAME="speech-"`date +"%s".json`
+cat <<EOF > $FILENAME
+{
+  "audioConfig": {
+     'audioEncoding':'MP3'
+  },
+  "voice": {
+    "languageCode": "en-US",
+    "name": "en-US-Wavenet-F"
+  },
+  "input": {
+    "text": $ttext
+  }
+}
+EOF
+
+cat $FILENAME
+
+curl -k -X POST -H "X-Goog-Api-Key: $GKEY" --header "Content-type":"application/json" --data-binary @${FILENAME} 'https://texttospeech.googleapis.com/v1beta1/text:synthesize' > synthesize-text.txt
+
+Data123=$(cat synthesize-text.txt)
+v2=${Data123:21:-3}
+#v3=${v2:0:-3}
+echo "$v2" > synthesize-output-base64.txt
+
+base64 synthesize-output-base64.txt --decode > synthesized-audio.mp3
+
+xplayer synthesized-audio.mp3
