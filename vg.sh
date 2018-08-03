@@ -21,7 +21,7 @@ cat <<EOF > $FILENAME
   "config": {
     "encoding":"FLAC",
     "sampleRateHertz":16000,
-    "profanityFilter": true,
+    "profanityFilter": false,
     "languageCode": "ru-RU",
     "speechContexts": {
       "phrases": ['']
@@ -45,28 +45,37 @@ read -p "Press enter when you're ready to record" rec
 if [ -z $rec ]; then
   rec --channels=1 --bits=16 --rate=16000 audio.flac trim 0 5
   echo \"`base64 audio.flac -w 0`\" > audio.base64
-  sed -i '' -e '/"content":/r audio.base64' $FILENAME
+  sed -i 'audio.base64' -e '/ "content":/r audio.base64' $FILENAME
 fi
-echo Request "file" $FILENAME created:
-head -7 $FILENAME # Don't print the entire file because there's a giant base64 string
-echo $'\t"Your base64 string..."\n\x20\x20}\n}'
+
+##echo Request "file" $FILENAME created:
+##head -7 $FILENAME # Don't print the entire file because there's a giant base64 string
+##echo $'\t"Your base64 string..."\n\x20\x20}\n}'
 
 # Call the speech API (requires an API key)jq '.results[0].alternatives[0].transcript'
 #read -p $'\nPress enter when you\'re ready to call the Speech API' var
 #if [ -z $var ];
 #  then
-    echo "Running the following curl command:"
-    echo "curl -s -X POST -H 'Content-Type: application/json' --data-binary @${FILENAME} https://speech.googleapis.com/v1/speech:recognize?key="
-    curl -s -X POST -H "Content-Type: application/json" --data-binary @${FILENAME} https://speech.googleapis.com/v1/speech:recognize?key=$GKEY |jq '.results[0].alternatives[0].transcript' > ttext.txt
+    echo "Converting to text..."
+#    echo "curl -s -X POST -H 'Content-Type: application/json' --data-binary @${FILENAME} https://speech.googleapis.com/v1/speech:recognize?key="
+ttext=`curl -s -X POST -H "Content-Type: application/json" --data-binary @${FILENAME} https://speech.googleapis.com/v1/speech:recognize?key=$GKEY |jq '.results[0].alternatives[0].transcript'`
 #fi
 
 #================================
+#ttext=$(cat ttext.txt)
+echo "The text recognized as: $ttext"
 
+#checking if the speech has been recognized
+if [ $ttext = null ]
+  then
+    echo "Cant recognize the text"
+    exit
+  else
+    echo "Строка \"string1\" не пустая."
+fi      # check why it goes ./vg.sh: line 69: [: too many arguments
 
-
-
-ttext=$(cat ttext.txt)
-
+#translate
+echo "/n Translating the text... /n"
 FILENAME="translate-"`date +"%s".json`
 cat <<EOF > $FILENAME
 {
@@ -75,13 +84,10 @@ cat <<EOF > $FILENAME
 }
 EOF
 
-curl -k -X POST -H "X-Goog-Api-Key: $GKEY" --header "Content-type":"application/json" --data-binary @${FILENAME} "https://translation.googleapis.com/language/translate/v2"|jq '.data.translations[0].translatedText' > translate.txt
-#curl -k -X POST -H "X-Goog-Api-Key: $GKEY" --header "Content-type":"application/json" --data-binary "@synt_settings" "https://translation.googleapis.com/language/translate/v2"|jq '.data[0].translations[0].translatedText' > translate.txt
-
-
-#curl -s -X POST -H "Content-Type: application/json" --data-binary @${FILENAME} https://speech.googleapis.com/v1/speech:recognize?key=$GKEY |jq '.results[0].alternatives[0].transcript' > translate.txt
+ttext=`curl -s -X POST -H "X-Goog-Api-Key: $GKEY" --header "Content-type":"application/json" --data-binary @${FILENAME} "https://translation.googleapis.com/language/translate/v2"|jq '.data.translations[0].translatedText'`
+#curl -k -X POST -H "X-Goog-Api-Key: $GKEY" --header "Content-type":"application/json" --data-binary @${FILENAME} "https://translation.googleapis.com/language/translate/v2"|jq '.data.translations[0].translatedText' > translate.txt
 #=================================
-ttext=$(cat translate.txt)
+#ttext=$(cat translate.txt)
 
 FILENAME="speech-"`date +"%s".json`
 cat <<EOF > $FILENAME
@@ -99,12 +105,13 @@ cat <<EOF > $FILENAME
 }
 EOF
 
-cat $FILENAME
+#cat $FILENAME
 
-curl -k -X POST -H "X-Goog-Api-Key: $GKEY" --header "Content-type":"application/json" --data-binary @${FILENAME} 'https://texttospeech.googleapis.com/v1beta1/text:synthesize' > synthesize-text.txt
+ttext=`curl -s -X POST -H "X-Goog-Api-Key: $GKEY" --header "Content-type":"application/json" --data-binary @${FILENAME} 'https://texttospeech.googleapis.com/v1beta1/text:synthesize'`
+# > synthesize-text.txt
 
-Data123=$(cat synthesize-text.txt)
-v2=${Data123:21:-3}
+#Data123=$(cat synthesize-text.txt)
+v2=${ttext:21:-3}
 #v3=${v2:0:-3}
 echo "$v2" > synthesize-output-base64.txt
 
